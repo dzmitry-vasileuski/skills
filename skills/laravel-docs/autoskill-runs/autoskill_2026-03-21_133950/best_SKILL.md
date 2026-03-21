@@ -1,12 +1,12 @@
 ---
 name: laravel-docs
-description: Search official Laravel ecosystem documentation using semantic vector search. Use this skill ONLY when version-specific information is needed for a Laravel ecosystem package (e.g., checking API changes between versions, confirming current syntax for a specific version, or verifying features available in a particular release). Do NOT use this skill for general Laravel knowledge that the agent already knows — only when accurate, version-specific documentation is required. Covers laravel/framework, livewire, inertia, filament, and other ecosystem packages. IMPORTANT - Use 2-4 word technical queries (e.g., "hasMany belongsTo"), NOT natural language questions (e.g., "how to create relationship").
+description: Search official Laravel ecosystem documentation using semantic vector search. Use this skill whenever writing or modifying Laravel application code — search the docs first to discover the current API before writing any implementation. The agent's training data has a knowledge cutoff; newer Laravel versions regularly add cleaner methods that replace familiar patterns. Always search before writing code for any Laravel feature: caching, string helpers, collections, concurrency, request handling, Eloquent, routing, queues, events, mail, and more. Covers laravel/framework, livewire, inertia, filament, and other ecosystem packages. IMPORTANT - Use 2-4 word technical queries (e.g., "hasMany belongsTo"), NOT natural language questions (e.g., "how to create relationship").
 license: Complete terms in LICENSE.txt
 ---
 
 # Laravel Documentation Search
 
-Search the official Laravel ecosystem documentation in real-time via the boost.laravel.com API. This gives you accurate, version-specific documentation instead of relying on potentially outdated knowledge.
+Search the official Laravel ecosystem documentation in real-time via the boost.laravel.com API. This gives you accurate, up-to-date documentation — always search before writing code, since newer Laravel versions regularly introduce cleaner APIs that replace familiar patterns.
 
 ## Overview
 
@@ -24,15 +24,14 @@ The API uses **vector embeddings** for semantic search. This means:
 ## High-Level Workflow
 
 ```
-Agent works with Laravel code → Detect project context → Craft technical query → Search docs → Apply findings
+Search docs first → Detect project context → Craft technical query → Apply findings → Write code
 ```
 
 **When to use this skill:**
-- Writing or modifying Laravel code
-- Debugging Laravel applications
-- Researching Laravel features or packages
-- Answering questions about Laravel
-- Verifying version-specific syntax or APIs
+- Before writing any new Laravel code — search to confirm the current API
+- When modifying existing Laravel code — the API may have changed
+- When debugging — verify the correct usage for the installed version
+- When answering questions about Laravel features or packages
 
 ### Phase 1: Detect Project Context
 
@@ -58,7 +57,7 @@ This is **VERY IMPORTANT**: Natural language questions return ZERO results. The 
 ### Phase 3: Execute Search
 
 ```bash
-phyton3 scripts/search.py "your query" --dir /path/to/project
+python3 scripts/search.py "your query" --dir /path/to/project
 ```
 
 ### Phase 4: Present Results
@@ -193,19 +192,19 @@ The API returns markdown-formatted documentation. Present the relevant sections 
 
 ```bash
 # Basic search (auto-detects packages from composer.json)
-phyton3 scripts/search.py "routing" --token-limit 800
+python3 scripts/search.py "routing"
 
-# Multiple related queries in one call (saves round-trips)
-phyton3 scripts/search.py "middleware" "authentication" --token-limit 1000
+# Multiple queries in one call
+python3 scripts/search.py "middleware" "authentication"
 
-# Implementation task: start at 1000, escalate only if truncated
-phyton3 scripts/search.py "eager loading relationships" --token-limit 1000
+# Adjust response size
+python3 scripts/search.py "queues jobs" --token-limit 5000
 
 # Manually specify packages
-phyton3 scripts/search.py "policies" --package laravel/framework:11.x --token-limit 800
+python3 scripts/search.py "policies" --package laravel/framework:11.x
 
 # Specify project directory
-phyton3 scripts/search.py "validation" --dir /path/to/laravel/project --token-limit 800
+python3 scripts/search.py "validation" --dir /path/to/laravel/project
 ```
 
 ### Options
@@ -218,32 +217,35 @@ phyton3 scripts/search.py "validation" --dir /path/to/laravel/project --token-li
 
 ### Token Limit Guide
 
-**ALWAYS specify `--token-limit` explicitly. Never rely on the 3000 default — it wastes context.**
+The token limit controls how much documentation is returned. Choosing the right limit prevents context pollution.
 
-**Start low. Escalate only when truncated.** If a response is cut off mid-sentence, increase by 500 and retry. Never guess high.
+**By query specificity:**
 
-**Prescribed limits by task:**
+| Query Type | Examples | Recommended | Why |
+|------------|----------|-------------|-----|
+| **Method lookup** | `"hasMany"`, `"route:list"` | `1000-1500` | Need code examples, not exhaustive docs |
+| **Concept understanding** | `"eager loading"`, `"soft deletes"` | `1000-1500` | Need explanation + examples |
+| **Feature exploration** | `"validation rules"`, `"authentication"` | `1500-2000` | Multiple approaches to compare |
+| **Broad overview** | `"eloquent"`, `"routing"` | `2000-3000` | Comprehensive reference |
 
-| Query Type | Examples | Use This Limit |
-|------------|----------|----------------|
-| **Syntax check** | `"hasMany"`, `"route:list"` | `800` |
-| **Implementation** | `"eager loading"`, `"soft deletes"`, `"dispatch job"` | `1000` |
-| **Feature comparison** | `"validation rules"`, `"auth middleware"` | `1500` |
-| **Broad overview** | `"eloquent"`, `"routing"` | `2000` |
+**Decision guide:**
 
-**Escalation pattern:**
 ```
-Start at the prescribed limit above
-  → truncated? → add 500 and retry once
-  → still truncated? → query is too broad — add specificity instead
+What do you need?
+├─ Quick syntax check → 500-1000
+├─ How to implement X → 1000-1500
+├─ Compare approaches → 1500-2000
+└─ Deep research → 2000-3000
+
+Still getting truncated? → Query too broad, add specificity instead of increasing limit
 ```
 
 **Warning signs:**
-- **No code examples** → Limit too low, increase by 500
-- **Too much unrelated content** → Limit too high OR query too broad — narrow the query first
+- **No code examples** → Limit too low, increase to 1000+
+- **Too much unrelated content** → Limit too high OR query too broad
 - **Truncated mid-sentence** → Increase by 500 and retry
 
-**Batching rule:** Combine related queries into a single `search.py` call instead of making multiple calls. This saves a round-trip and keeps related results together.
+**Default: 3000** is generous for most cases. For focused lookups, use 1000-1500 to save tokens.
 
 ---
 

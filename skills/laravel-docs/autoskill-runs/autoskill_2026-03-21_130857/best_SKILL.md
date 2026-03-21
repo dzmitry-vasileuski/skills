@@ -58,7 +58,7 @@ This is **VERY IMPORTANT**: Natural language questions return ZERO results. The 
 ### Phase 3: Execute Search
 
 ```bash
-phyton3 scripts/search.py "your query" --dir /path/to/project
+python3 scripts/search.py "your query" --dir /path/to/project
 ```
 
 ### Phase 4: Present Results
@@ -193,19 +193,19 @@ The API returns markdown-formatted documentation. Present the relevant sections 
 
 ```bash
 # Basic search (auto-detects packages from composer.json)
-phyton3 scripts/search.py "routing" --token-limit 800
+python3 scripts/search.py "routing"
 
-# Multiple related queries in one call (saves round-trips)
-phyton3 scripts/search.py "middleware" "authentication" --token-limit 1000
+# Multiple queries in one call
+python3 scripts/search.py "middleware" "authentication"
 
-# Implementation task: start at 1000, escalate only if truncated
-phyton3 scripts/search.py "eager loading relationships" --token-limit 1000
+# Adjust response size
+python3 scripts/search.py "queues jobs" --token-limit 5000
 
 # Manually specify packages
-phyton3 scripts/search.py "policies" --package laravel/framework:11.x --token-limit 800
+python3 scripts/search.py "policies" --package laravel/framework:11.x
 
 # Specify project directory
-phyton3 scripts/search.py "validation" --dir /path/to/laravel/project --token-limit 800
+python3 scripts/search.py "validation" --dir /path/to/laravel/project
 ```
 
 ### Options
@@ -218,32 +218,35 @@ phyton3 scripts/search.py "validation" --dir /path/to/laravel/project --token-li
 
 ### Token Limit Guide
 
-**ALWAYS specify `--token-limit` explicitly. Never rely on the 3000 default — it wastes context.**
+The token limit controls how much documentation is returned. Choosing the right limit prevents context pollution.
 
-**Start low. Escalate only when truncated.** If a response is cut off mid-sentence, increase by 500 and retry. Never guess high.
+**By query specificity:**
 
-**Prescribed limits by task:**
+| Query Type | Examples | Recommended | Why |
+|------------|----------|-------------|-----|
+| **Method lookup** | `"hasMany"`, `"route:list"` | `1000-1500` | Need code examples, not exhaustive docs |
+| **Concept understanding** | `"eager loading"`, `"soft deletes"` | `1000-1500` | Need explanation + examples |
+| **Feature exploration** | `"validation rules"`, `"authentication"` | `1500-2000` | Multiple approaches to compare |
+| **Broad overview** | `"eloquent"`, `"routing"` | `2000-3000` | Comprehensive reference |
 
-| Query Type | Examples | Use This Limit |
-|------------|----------|----------------|
-| **Syntax check** | `"hasMany"`, `"route:list"` | `800` |
-| **Implementation** | `"eager loading"`, `"soft deletes"`, `"dispatch job"` | `1000` |
-| **Feature comparison** | `"validation rules"`, `"auth middleware"` | `1500` |
-| **Broad overview** | `"eloquent"`, `"routing"` | `2000` |
+**Decision guide:**
 
-**Escalation pattern:**
 ```
-Start at the prescribed limit above
-  → truncated? → add 500 and retry once
-  → still truncated? → query is too broad — add specificity instead
+What do you need?
+├─ Quick syntax check → 500-1000
+├─ How to implement X → 1000-1500
+├─ Compare approaches → 1500-2000
+└─ Deep research → 2000-3000
+
+Still getting truncated? → Query too broad, add specificity instead of increasing limit
 ```
 
 **Warning signs:**
-- **No code examples** → Limit too low, increase by 500
-- **Too much unrelated content** → Limit too high OR query too broad — narrow the query first
+- **No code examples** → Limit too low, increase to 1000+
+- **Too much unrelated content** → Limit too high OR query too broad
 - **Truncated mid-sentence** → Increase by 500 and retry
 
-**Batching rule:** Combine related queries into a single `search.py` call instead of making multiple calls. This saves a round-trip and keeps related results together.
+**Default: 3000** is generous for most cases. For focused lookups, use 1000-1500 to save tokens.
 
 ---
 

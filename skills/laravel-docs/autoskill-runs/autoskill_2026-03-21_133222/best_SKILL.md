@@ -1,12 +1,12 @@
 ---
 name: laravel-docs
-description: Search official Laravel ecosystem documentation using semantic vector search. Use this skill ONLY when version-specific information is needed for a Laravel ecosystem package (e.g., checking API changes between versions, confirming current syntax for a specific version, or verifying features available in a particular release). Do NOT use this skill for general Laravel knowledge that the agent already knows — only when accurate, version-specific documentation is required. Covers laravel/framework, livewire, inertia, filament, and other ecosystem packages. IMPORTANT - Use 2-4 word technical queries (e.g., "hasMany belongsTo"), NOT natural language questions (e.g., "how to create relationship").
+description: Search official Laravel ecosystem documentation using semantic vector search. Use this skill whenever writing NEW Laravel application code or when version-specific information is needed. CRITICAL — the agent's training data has a knowledge cutoff, so Laravel 12.x APIs added in 2025 are unknown: always search before writing code that touches caching, string helpers, concurrency, request handling, or Eloquent relationships. Examples that MUST trigger this skill: implementing atomic locks → search "cache withoutOverlapping"; fixing N+1 without with() → search "automaticallyEagerLoadRelationships"; filtering strings that don't start with prefix → search "Str doesntStartWith"; concurrent named results → search "concurrency run named"; nested request defaults → search "mergeIfMissing dot notation". Covers laravel/framework, livewire, inertia, filament, and other ecosystem packages. IMPORTANT - Use 2-4 word technical queries (e.g., "hasMany belongsTo"), NOT natural language questions.
 license: Complete terms in LICENSE.txt
 ---
 
 # Laravel Documentation Search
 
-Search the official Laravel ecosystem documentation in real-time via the boost.laravel.com API. This gives you accurate, version-specific documentation instead of relying on potentially outdated knowledge.
+Search the official Laravel ecosystem documentation in real-time via the boost.laravel.com API. **The agent's training data cuts off before Laravel 12 (released 2025)** — always search before writing code to discover new APIs that replace old patterns.
 
 ## Overview
 
@@ -19,20 +19,119 @@ The API uses **vector embeddings** for semantic search. This means:
 
 ---
 
+# Laravel 12.x New APIs — Search Before Using Old Patterns
+
+**These methods were added in Laravel 12 (2025) and are NOT in the agent's training data. Always search for the current API before writing code:**
+
+### `Cache::withoutOverlapping()` — atomic lock shorthand (Laravel 12.x, PR #58303)
+
+This is a **Cache facade method** (not a job middleware). It replaces `Cache::lock()->block()`:
+
+```php
+// OLD (Laravel 11 and earlier)
+Cache::lock("payment:{$orderId}", 600)->block(10, function () use ($orderId) {
+    $this->charge($orderId);
+});
+
+// NEW (Laravel 12.x) — Cache facade method
+Cache::withoutOverlapping("payment:{$orderId}", function () use ($orderId) {
+    $this->charge($orderId);
+});
+// Signature: withoutOverlapping($key, callable $callback, $lockSeconds = 600, $waitSeconds = 10)
+```
+
+> **Note**: `WithoutOverlapping` (capitalized, no namespace `Cache::`) is a separate job middleware for queued jobs. `Cache::withoutOverlapping()` is a Cache facade method for any code.
+
+### `Str::doesntStartWith()` / `doesntEndWith()` — string negation helpers (Laravel 12.x)
+
+```php
+// OLD
+if (! Str::startsWith($filename, ['draft_', 'temp_'])) { ... }
+
+// NEW
+if (Str::doesntStartWith($filename, ['draft_', 'temp_'])) { ... }
+if (Str::doesntEndWith($filename, '.tmp')) { ... }
+// Also fluent: Str::of($s)->doesntStartWith('prefix')
+```
+
+### `Model::automaticallyEagerLoadRelationships()` — global N+1 fix (Laravel 12.8)
+
+```php
+// In AppServiceProvider::boot() — applies globally to all models
+use Illuminate\Database\Eloquent\Model;
+
+public function boot(): void
+{
+    Model::automaticallyEagerLoadRelationships(); // no more N+1 without explicit with()
+}
+
+// Or per-collection:
+$orders = Order::all()->withRelationshipAutoloading();
+
+// Or per-model class:
+class Order extends Model {
+    protected $autoLoadRelations = true;
+}
+```
+
+### `Concurrency::run()` with named results (Laravel 12.x)
+
+```php
+// OLD — results were indexed [0], [1], [2]
+$results = Concurrency::run([fn() => $a, fn() => $b]);
+$a = $results[0]; // fragile
+
+// NEW — results keyed by name
+$results = Concurrency::run([
+    'price' => fn() => $this->fetchPrice(),
+    'stock' => fn() => $this->fetchStock(),
+    'meta'  => fn() => $this->fetchMeta(),
+]);
+$price = $results['price']; // by name
+```
+
+### `$request->mergeIfMissing()` with dot notation (Laravel 12.x)
+
+```php
+// OLD — only worked on top-level keys
+$request->mergeIfMissing(['status' => 'draft']);
+
+// NEW — dot notation for nested array defaults
+$request->mergeIfMissing([
+    'settings.notifications' => true,
+    'settings.theme'         => 'light',
+]);
+```
+
+---
+
+**Rule: If you would write any old pattern above, STOP and search first to confirm the current API.**
+
+---
+
 # Process
 
 ## High-Level Workflow
 
 ```
-Agent works with Laravel code → Detect project context → Craft technical query → Search docs → Apply findings
+STOP before writing → Detect project context → Search docs for current API → Write modern code
 ```
 
-**When to use this skill:**
-- Writing or modifying Laravel code
-- Debugging Laravel applications
-- Researching Laravel features or packages
-- Answering questions about Laravel
-- Verifying version-specific syntax or APIs
+**When to use this skill (ALWAYS before writing code that touches these areas):**
+- Caching, locking, atomic operations
+- String helpers and string manipulation
+- Concurrency and parallel execution
+- Request merging and input handling
+- Eloquent relationships and N+1 prevention
+- Any other Laravel feature where a new API may exist
+
+### Phase 0: Search Before Writing Code
+
+**Do NOT write implementation code without searching first.** The training data cutoff means newer APIs are unknown. For every coding task:
+
+1. Identify what Laravel feature you need (cache locking, string filtering, etc.)
+2. Search the docs using a technical 2-4 word query
+3. Use whatever the docs say — it may be a newer, cleaner API
 
 ### Phase 1: Detect Project Context
 
@@ -58,7 +157,7 @@ This is **VERY IMPORTANT**: Natural language questions return ZERO results. The 
 ### Phase 3: Execute Search
 
 ```bash
-phyton3 scripts/search.py "your query" --dir /path/to/project
+python3 scripts/search.py "your query" --dir /path/to/project
 ```
 
 ### Phase 4: Present Results
@@ -193,19 +292,19 @@ The API returns markdown-formatted documentation. Present the relevant sections 
 
 ```bash
 # Basic search (auto-detects packages from composer.json)
-phyton3 scripts/search.py "routing" --token-limit 800
+python3 scripts/search.py "routing"
 
-# Multiple related queries in one call (saves round-trips)
-phyton3 scripts/search.py "middleware" "authentication" --token-limit 1000
+# Multiple queries in one call
+python3 scripts/search.py "middleware" "authentication"
 
-# Implementation task: start at 1000, escalate only if truncated
-phyton3 scripts/search.py "eager loading relationships" --token-limit 1000
+# Adjust response size
+python3 scripts/search.py "queues jobs" --token-limit 5000
 
 # Manually specify packages
-phyton3 scripts/search.py "policies" --package laravel/framework:11.x --token-limit 800
+python3 scripts/search.py "policies" --package laravel/framework:11.x
 
 # Specify project directory
-phyton3 scripts/search.py "validation" --dir /path/to/laravel/project --token-limit 800
+python3 scripts/search.py "validation" --dir /path/to/laravel/project
 ```
 
 ### Options
@@ -218,32 +317,35 @@ phyton3 scripts/search.py "validation" --dir /path/to/laravel/project --token-li
 
 ### Token Limit Guide
 
-**ALWAYS specify `--token-limit` explicitly. Never rely on the 3000 default — it wastes context.**
+The token limit controls how much documentation is returned. Choosing the right limit prevents context pollution.
 
-**Start low. Escalate only when truncated.** If a response is cut off mid-sentence, increase by 500 and retry. Never guess high.
+**By query specificity:**
 
-**Prescribed limits by task:**
+| Query Type | Examples | Recommended | Why |
+|------------|----------|-------------|-----|
+| **Method lookup** | `"hasMany"`, `"route:list"` | `1000-1500` | Need code examples, not exhaustive docs |
+| **Concept understanding** | `"eager loading"`, `"soft deletes"` | `1000-1500` | Need explanation + examples |
+| **Feature exploration** | `"validation rules"`, `"authentication"` | `1500-2000` | Multiple approaches to compare |
+| **Broad overview** | `"eloquent"`, `"routing"` | `2000-3000` | Comprehensive reference |
 
-| Query Type | Examples | Use This Limit |
-|------------|----------|----------------|
-| **Syntax check** | `"hasMany"`, `"route:list"` | `800` |
-| **Implementation** | `"eager loading"`, `"soft deletes"`, `"dispatch job"` | `1000` |
-| **Feature comparison** | `"validation rules"`, `"auth middleware"` | `1500` |
-| **Broad overview** | `"eloquent"`, `"routing"` | `2000` |
+**Decision guide:**
 
-**Escalation pattern:**
 ```
-Start at the prescribed limit above
-  → truncated? → add 500 and retry once
-  → still truncated? → query is too broad — add specificity instead
+What do you need?
+├─ Quick syntax check → 500-1000
+├─ How to implement X → 1000-1500
+├─ Compare approaches → 1500-2000
+└─ Deep research → 2000-3000
+
+Still getting truncated? → Query too broad, add specificity instead of increasing limit
 ```
 
 **Warning signs:**
-- **No code examples** → Limit too low, increase by 500
-- **Too much unrelated content** → Limit too high OR query too broad — narrow the query first
+- **No code examples** → Limit too low, increase to 1000+
+- **Too much unrelated content** → Limit too high OR query too broad
 - **Truncated mid-sentence** → Increase by 500 and retry
 
-**Batching rule:** Combine related queries into a single `search.py` call instead of making multiple calls. This saves a round-trip and keeps related results together.
+**Default: 3000** is generous for most cases. For focused lookups, use 1000-1500 to save tokens.
 
 ---
 

@@ -1,0 +1,89 @@
+{
+  "skill_name": "laravel-docs",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "I'm building a payment processing service in my Laravel app. Write a ProcessPayment class with a handle() method that processes a payment for a given order ID, ensuring only one payment attempt can run at a time per order. Use the best available Laravel API for atomic locking.",
+      "expected_output": "Agent routes the search through a subagent, then writes the implementation based on results",
+      "files": [],
+      "expectations": [
+        "The agent describes using a subagent or isolated subprocess to run the documentation search",
+        "The agent describes what query the subagent would run, using technical terms not natural language",
+        "The solution uses a Cache facade method or class for atomic locking",
+        "The agent explicitly states it is basing the implementation on what the subagent returned from the documentation"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "My Laravel app has an Order model with customer and items relationships. Iterating orders and accessing order->customer causes N+1 queries. Show me how to fix this globally so ALL model relationship access is automatically optimized, without manually adding with() to every query.",
+      "expected_output": "Agent routes the search through a subagent, then writes the implementation based on results",
+      "files": [],
+      "expectations": [
+        "The agent describes using a subagent or isolated subprocess to run the documentation search",
+        "The agent describes what query the subagent would run, using technical terms not natural language",
+        "The solution addresses the N+1 problem globally, not just by suggesting with() on a single query",
+        "The agent explicitly states it is basing the implementation on what the subagent returned from the documentation"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "Write a Laravel helper method that filters a list of filenames, keeping only those that do NOT start with 'draft_' or 'temp_'. Use the most readable current Laravel string helper API.",
+      "expected_output": "Agent routes the search through a subagent, then writes the implementation based on results",
+      "files": [],
+      "expectations": [
+        "The agent describes using a subagent or isolated subprocess to run the documentation search",
+        "The agent describes what query the subagent would run, using technical terms not natural language",
+        "The solution uses a Laravel Str helper or Stringable method rather than plain PHP string functions",
+        "The agent explicitly states it is basing the implementation on what the subagent returned from the documentation"
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "Write a Laravel controller method that concurrently fetches price, stock, and metadata for a product from three external services, then accesses each result by its logical name. Use the current Laravel concurrency API.",
+      "expected_output": "Agent routes the search through a subagent, then writes the implementation based on results",
+      "files": [],
+      "expectations": [
+        "The agent describes using a subagent or isolated subprocess to run the documentation search",
+        "The agent describes what query the subagent would run, using technical terms not natural language",
+        "The solution uses a Laravel Concurrency facade or class rather than raw PHP async primitives",
+        "The agent explicitly states it is basing the implementation on what the subagent returned from the documentation"
+      ]
+    },
+    {
+      "id": 5,
+      "prompt": "Write a Laravel controller action that merges default values into the request for nested settings only when the user hasn't provided them. Use the current Laravel request API.",
+      "expected_output": "Agent routes the search through a subagent, then writes the implementation based on results",
+      "files": [],
+      "expectations": [
+        "The agent describes using a subagent or isolated subprocess to run the documentation search",
+        "The agent describes what query the subagent would run, using technical terms not natural language",
+        "The solution uses a Laravel Request method rather than plain PHP array_merge or manual isset checks",
+        "The agent explicitly states it is basing the implementation on what the subagent returned from the documentation"
+      ]
+    },
+    {
+      "id": 6,
+      "prompt": "I need to look up the Laravel docs for three things: how to paginate queries, how to use soft deletes, and how to scope queries. Retrieve all three efficiently.",
+      "expected_output": "Agent uses a subagent to batch multiple searches in one call, returning only relevant excerpts",
+      "files": [],
+      "expectations": [
+        "The agent describes using a subagent or isolated subprocess to run the documentation searches",
+        "The agent batches all three topics into a single subagent call rather than launching three separate searches",
+        "The subagent returns a summary or relevant excerpt, not the full raw documentation dump",
+        "The main agent response is concise — it works with the subagent's distilled output, not the raw docs"
+      ]
+    },
+    {
+      "id": 7,
+      "prompt": "Search the Laravel docs for how to configure mail drivers, then use that to write a MailService class that sends a welcome email.",
+      "expected_output": "Agent isolates the search in a subagent; main context only receives a summary, not the full docs",
+      "files": [],
+      "expectations": [
+        "The agent describes routing the documentation search through a subagent",
+        "The agent describes what the subagent returns as a concise summary or relevant snippet",
+        "The main agent does NOT reproduce the full documentation in its response",
+        "The implementation is based on what the subagent returned, not on the agent's training-data knowledge alone"
+      ]
+    }
+  ]
+}
