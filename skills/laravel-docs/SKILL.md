@@ -1,341 +1,92 @@
 ---
 name: laravel-docs
-description: Search official Laravel ecosystem documentation using semantic vector search. Use this skill whenever writing or modifying Laravel application code — search the docs first to discover the current API before writing any implementation. The agent's training data has a knowledge cutoff; newer Laravel versions regularly add cleaner methods that replace familiar patterns. Always search before writing code for any Laravel feature — caching, string helpers, collections, concurrency, request handling, Eloquent, routing, queues, events, mail, and more. Covers laravel/framework, livewire, inertia, filament, and other ecosystem packages. IMPORTANT - Use 2-4 word technical queries (e.g., "hasMany belongsTo"), NOT natural language questions (e.g., "how to create relationship").
-license: Complete terms in LICENSE.txt
+description: Search official Laravel ecosystem documentation using semantic vector search. Use this skill whenever writing or modifying Laravel application code — search the docs first to discover the current API before writing any implementation. The agent's training data has a knowledge cutoff; newer Laravel versions regularly add cleaner methods that replace familiar patterns. Always search before writing code for any Laravel feature — caching, string helpers, collections, concurrency, request handling, Eloquent, routing, queues, events, mail, and more. Also use this skill when the user references a Laravel version you don't have training data for, when you're unsure whether an API still exists or has changed, or when you want to verify your knowledge is current — the docs API always has the latest information. IMPORTANT - Use 2-4 word technical queries (e.g., "hasMany belongsTo"), NOT natural language questions (e.g., "how to create relationship").
 ---
 
 # Laravel Documentation Search
 
-Search the official Laravel ecosystem documentation in real-time via the boost.laravel.com API. This gives you accurate, up-to-date documentation — always search before writing code, since newer Laravel versions regularly introduce cleaner APIs that replace familiar patterns.
+Search the official Laravel framework documentation in real-time via the boost.laravel.com API. This gives you accurate, up-to-date documentation — always search before writing code, since newer Laravel versions regularly introduce cleaner APIs that replace familiar patterns.
 
 ## Overview
 
-The API uses **vector embeddings** for semantic search. This means:
-- Queries are converted to vector embeddings and compared against document vectors
-- Results are ranked by semantic similarity (cosine distance)
-- Markdown-formatted documentation chunks are returned
-
-**This is NOT keyword search** - it's semantic matching. Understanding this is critical to writing effective queries.
+The API uses **vector embeddings** for semantic search — queries are converted to vectors and matched by semantic similarity, not keywords. Understanding this is critical to writing effective queries.
 
 ---
 
-# Process
-
-## High-Level Workflow
+## Workflow
 
 ```
-Search docs first → Detect project context → Craft technical query → Apply findings → Write code
+Determine Laravel version → Craft queries → Search docs (1-2 calls max) → Apply findings → Write code
 ```
 
-**When to use this skill:**
-- Before writing any new Laravel code — search to confirm the current API
-- When modifying existing Laravel code — the API may have changed
-- When debugging — verify the correct usage for the installed version
-- When answering questions about Laravel features or packages
+### Step 1: Determine Laravel Version
 
-### Phase 1: Detect Project Context
+If the user mentioned their Laravel version, use it. Otherwise, read `composer.json` from the project root and find the `laravel/framework` version in the `require` section. Normalize it to `major.x` format (e.g., `"^11.42.0"` becomes `11.x`).
 
-Check for `composer.json` in the project to determine:
-- Which Laravel packages are installed
-- What versions are being used
+### Step 2: Craft All Queries Upfront
 
-```bash
-cat composer.json
-```
+Before making any API call, identify **all** the sub-topics in the user's question and craft a query for each one. The API accepts multiple queries in a single call — use this to cover the entire question in one round-trip.
 
-The search script auto-detects packages and scopes results to the relevant versions.
+The API does **semantic matching**, not keyword search. Natural language questions return ZERO results.
 
-### Phase 2: Craft the Query
-
-**THE CRITICAL UNDERSTANDING**:
 - The concept: "How do I create a route in Laravel?"
 - What you search: `"route definition"` or `"Route::get"`
-- What happens: Vector embeddings find semantically similar docs
 
-This is **VERY IMPORTANT**: Natural language questions return ZERO results. The API matches concepts, not conversational text.
+### Step 3: Search (1-2 API calls maximum)
 
-### Phase 3: Execute Search
+Batch all your queries into a **single** curl call. The `queries` array accepts multiple entries — use it.
 
 ```bash
-python3 scripts/search.py "your query" --dir /path/to/project
+curl -sS -X POST https://boost.laravel.com/api/docs \
+  -H "Content-Type: application/json" \
+  -d '{
+    "queries": ["query one", "query two", "query three"],
+    "packages": [{"name": "laravel/framework", "version": "13.x"}],
+    "token_limit": 1500,
+    "format": "markdown"
+  }'
 ```
 
-### Phase 4: Present Results
+Replace `"11.x"` with the detected version. You should almost never need more than **2 curl calls total** for any question. If the first call covers everything, stop there.
+
+### Step 4: Apply Results
 
 The API returns markdown-formatted documentation. Present the relevant sections to the user, summarizing key points and including code examples when helpful.
 
 ---
 
-## Query Best Practices
-
-### The 4 Golden Rules
+## Query Craft Rules
 
 **1. NEVER use natural language questions**
-```bash
+```
 # Returns ZERO results
 "How do I create a route in Laravel?"
-"What is the best way to validate forms?"
 
 # Use technical terms instead
 "route definition"
 "form request validation"
 ```
 
-**2. Target 5-15 documents**
-| Docs | Quality | Action |
-|------|---------|--------|
-| 0 | Failed | Remove question words, use technical terms |
-| 1-5 | Narrow | Might miss info, try broader terms |
-| 5-15 | Optimal | Sweet spot - targeted but comprehensive |
-| 15-30 | Acceptable | Broader but still useful |
-| 30+ | Too broad | Add more specific terms |
+**2. Use 2-4 words** — 1 word is too broad, 3 words is optimal.
 
-**3. Use 2-4 words**
-| Word Count | Avg Docs | Quality |
-|------------|----------|---------|
-| 1 word | 33 | Too broad |
-| 2 words | 16 | Good |
-| 3 words | 14 | Optimal |
-| 4 words | 15 | Good |
+**3. Use Laravel-specific vocabulary** — prefer framework terms over generic ones (e.g., "eloquent" not "database model", "mailable" not "email class", "form request" not "input validator").
 
-**4. Word order matters**
-```bash
-# Different results!
-"queue worker supervisor"  → 9 docs
-"supervisor queue worker"  → 4 docs
+**4. Use method/class names when you know them** — they are the most specific queries (e.g., `"hasMany belongsTo"`, `"Cache::remember"`).
 
-# Prefer natural technical order
-"eager loading relationships"  → 8 docs ✓
-"relationships eager loading"  → 9 docs
-```
+**5. Word order matters** — prefer natural technical order. `"queue worker supervisor"` returns different results than `"supervisor queue worker"`.
 
 ---
 
-## Query Patterns
+## Token Limit
 
-### What Works Best
-
-**Method and class names** (most specific):
-```bash
-"hasMany belongsTo"           → 2 docs
-"route:list"                  → 3 docs
-"custom validation rule"      → 3 docs
-"cache remember"              → 6 docs
-```
-
-**Technical terms over descriptions**:
-```bash
-# Better (technical)
-"hasMany"            → 2 docs
-"paginate"           → 7 docs
-"validate"           → 6 docs
-
-# Worse (descriptive)
-"one to many"        → 16 docs
-"split into pages"   → 3 docs
-"check input"        → 9 docs
-```
-
-**Laravel-specific vocabulary**:
-```bash
-# Laravel term        → Better than generic
-"eloquent"           → "database model"
-"mailable"           → "email class"
-"artisan command"    → "cli command"
-"form request"       → "input validator"
-```
-
-### What to Avoid
-
-❌ **Natural language questions** (return zero results):
-```bash
-"How do I..."
-"What is the..."
-"How can I..."
-```
-
-❌ **Single broad keywords**:
-```bash
-"cache"              → 33 docs
-"event"              → 32 docs
-"model"              → 25 docs
-```
-
-❌ **Generic/non-Laravel terms**:
-```bash
-"database"           → Use "eloquent" or "query builder"
-"email"              → Use "mailable" or "notification"
-"background"         → Use "queue" or "dispatch"
-```
-
----
-
-## Quick Reference by Topic
-
-| Topic | Best Queries | Avoid |
-|-------|-------------|-------|
-| **Routes** | `"route:list"`, `"route model binding"`, `"route group middleware"` | `"how to add route"`, `"list of routes"` |
-| **Eloquent** | `"hasMany belongsTo"`, `"eager loading"`, `"eloquent relationships"` | `"database model"`, `"get data"` |
-| **Validation** | `"form request validation"`, `"custom validation rule"`, `"validation rules unique"` | `"how to validate"`, `"check input"` |
-| **Auth** | `"auth middleware"`, `"Auth::attempt"`, `"password reset email"` | `"how to login"`, `"user sign in"` |
-| **Queues** | `"queue worker supervisor"`, `"dispatch job"`, `"failed job retry"` | `"background task"`, `"run later"` |
-| **Cache** | `"cache remember"`, `"cache forget"`, `"cache driver redis"` | `"store data"`, `"save temporarily"` |
-| **Events** | `"event listener dispatch"`, `"event subscriber"` | `"trigger event"`, `"fire event"` |
-| **Mail** | `"mailable queue"`, `"markdown mail"`, `"mail attachment"` | `"send email"`, `"compose email"` |
-| **Migrations** | `"migration create table"`, `"schema builder column"`, `"foreign key constraint"` | `"create table"`, `"database schema"` |
-
----
-
-## CLI Reference
-
-### Basic Usage
-
-```bash
-# Syntax check — use 800
-python3 scripts/search.py "route:list" --token-limit 800
-
-# Implementation task — use 1000
-python3 scripts/search.py "eager loading relationships" --token-limit 1000
-
-# Multiple related queries in one call (saves round-trips) — use 1000
-python3 scripts/search.py "middleware" "authentication" --token-limit 1000
-
-# Manually specify packages
-python3 scripts/search.py "policies" --package laravel/framework:11.x --token-limit 800
-
-# Specify project directory
-python3 scripts/search.py "validation" --dir /path/to/laravel/project --token-limit 1000
-```
-
-### Options
-
-| Flag | Description |
-|------|-------------|
-| `--token-limit, -t` | Max tokens in response (default: 3000, max: 1000000) |
-| `--dir, -d` | Project directory with composer.json (default: current dir) |
-| `--package, -p` | Manually specify package as `name:version` (can repeat) |
-
-### Token Limit Guide
-
-**Always specify `--token-limit` explicitly. Never rely on the 3000 default — it wastes context.**
-
-**Start low. Escalate only when truncated.**
-
-| Query Type | Examples | Use This Limit |
-|------------|----------|----------------|
-| **Syntax check** | `"hasMany"`, `"route:list"` | `800` |
-| **Implementation** | `"eager loading"`, `"soft deletes"`, `"dispatch job"` | `1000` |
-| **Feature comparison** | `"validation rules"`, `"auth middleware"` | `1500` |
-| **Broad overview** | `"eloquent"`, `"routing"` | `2000` |
-
-**Escalation pattern:**
-```
-Start at the prescribed limit above
-  → truncated? → add 500 and retry once
-  → still truncated? → query is too broad — add specificity instead
-```
-
-**Warning signs:**
-- **No code examples** → Limit too low, increase by 500
-- **Too much unrelated content** → Limit too high OR query too broad — narrow the query first
-- **Truncated mid-sentence** → Increase by 500 and retry
-
-**Batching rule:** Combine related queries into a single `search.py` call instead of making multiple calls. This saves a round-trip and keeps related results together.
+Use `token_limit: 1500` as the default. This is enough for most queries. Only increase to 2000 if you need a broad overview of a large topic. Do not start low and escalate — it wastes round-trips.
 
 ---
 
 ## Troubleshooting
 
-### Problem: No results
-
-**Cause**: Natural language question
-```bash
-# Bad
-"How do I create a model?"
-
-# Fix: Remove question words, use technical terms
-"eloquent model create"
-```
-
-### Problem: Too many results (>30 docs)
-
-**Cause**: Query too broad
-```bash
-# Bad
-"cache"              → 33 docs
-
-# Fix: Add more specific terms
-"cache remember store" → 6 docs
-```
-
-### Problem: Irrelevant first result
-
-**Cause**: Wrong word order or generic terms
-```bash
-# Bad
-"job queue"
-
-# Fix: Try different order or more specific terms
-"queue dispatch job"
-```
-
-### Problem: Still not finding what you need
-
-**Solution**: Try multiple query variations
-```bash
-# Try related terms
-"eager loading"
-"with relationships"
-"prevent n+1 queries"
-```
-
----
-
-## Supported Packages
-
-The API indexes documentation for these packages:
-
-**Laravel Framework & First-Party:**
-- laravel/framework
-- laravel/ai
-- laravel/breeze
-- laravel/cashier
-- laravel/cashier-paddle
-- laravel/folio
-- laravel/fortify
-- laravel/horizon
-- laravel/jetstream
-- laravel/mcp
-- laravel/nova
-- laravel/octane
-- laravel/passport
-- laravel/pennant
-- laravel/pint
-- laravel/pulse
-- laravel/reverb
-- laravel/sail
-- laravel/sanctum
-- laravel/scout
-- laravel/socialite
-- laravel/spark
-- laravel/telescope
-- laravel/wayfinder
-
-**Ecosystem Packages:**
-- livewire/livewire
-- livewire/flux
-- livewire/flux-pro
-- livewire/volt
-- inertiajs/inertia-laravel
-- filament/filament
-- pestphp/pest
-- phpunit/phpunit
-
----
-
-## Reference Files
-
-- **scripts/search.py** - Python script for cross-platform API calls
-  - Auto-detects packages from composer.json
-  - Normalizes versions to `X.x` format
-  - Uses only Python stdlib (no dependencies)
+| Problem | Cause | Fix |
+|---------|-------|-----|
+| No results | Natural language question | Remove question words, use technical terms |
+| Too many results (>30) | Query too broad | Add more specific terms |
+| Irrelevant first result | Wrong word order or generic terms | Try different order or Laravel-specific terms |
