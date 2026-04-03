@@ -27,3 +27,12 @@ build/
 # Temporary
 *.tmp
 *.bak
+
+# Claude Code
+.claude/
+.agents/
+.kilo/
+
+# Skill workspaces and evals
+skills/*-workspace/
+skills/*/evals/
